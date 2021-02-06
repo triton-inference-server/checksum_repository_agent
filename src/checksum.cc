@@ -111,24 +111,40 @@ class MD5Sum : public CheckSum {
   unsigned char result_[MD5_DIGEST_LENGTH];
 };
 
-std::pair<RelativeFilePath, HashString>
-ParseFileAndChecksum(const std::string& formatted_checksum_output)
+std::pair<std::unique_ptr<CheckSum>, RelativeFilePath>
+ParseAlgorithmAndFile(const std::string& algorithm_and_file)
 {
-  auto pos = formatted_checksum_output.find(" ");
+  auto pos = algorithm_and_file.find(":");
   if (pos == std::string::npos) {
     THROW_TRITON_ERROR(
         TRITONSERVER_ERROR_INVALID_ARG,
-        (std::string("failed to parse checksum output: ") +
-         formatted_checksum_output)
+        (std::string("failed to parse key: ") + algorithm_and_file).c_str());
+  }
+
+  std::string lower_key = algorithm_and_file.substr(0, pos);
+  std::transform(
+      lower_key.begin(), lower_key.end(), lower_key.begin(),
+      [](unsigned char c) { return std::tolower(c); });
+
+  std::unique_ptr<CheckSum> hash_utility;
+  if (lower_key == "md5") {
+    hash_utility.reset(new MD5Sum());
+  } else {
+    THROW_TRITON_ERROR(
+        TRITONSERVER_ERROR_UNSUPPORTED,
+        (std::string("Unsupported checksum algorithm: ") +
+         algorithm_and_file.substr(0, pos))
             .c_str());
   }
-  return {formatted_checksum_output.substr(pos + 2),
-          formatted_checksum_output.substr(0, pos)};
+  return {std::move(hash_utility), algorithm_and_file.substr(pos + 1)};
 }
 
 const std::string
 ReadFile(const std::string& model_dir, const std::string& relative_file_path)
 {
+  // It could be more efficient to generate the checksum by streaming through
+  // the file than reading it in and then digesting it, but the latter is
+  // sufficient as an example.
   std::ifstream in(
       model_dir + "/" + relative_file_path, std::ios::in | std::ios::binary);
   if (!in) {
@@ -186,30 +202,18 @@ TRITONREPOAGENT_ModelAction(
     const char* value = nullptr;
     RETURN_IF_ERROR(
         TRITONREPOAGENT_ModelParameter(agent, model, idx, &key, &value));
-    std::string lower_key(key);
-    std::transform(
-        lower_key.begin(), lower_key.end(), lower_key.begin(),
-        [](unsigned char c) { return std::tolower(c); });
-
-    std::unique_ptr<CheckSum> hash_utility;
-    if (lower_key == "md5") {
-      hash_utility.reset(new MD5Sum());
-    } else {
-      return TRITONSERVER_ErrorNew(
-          TRITONSERVER_ERROR_UNSUPPORTED,
-          (std::string("Unsupported checksum algorithm: ") + key).c_str());
-    }
 
     try {
-      const auto file_and_sum = ParseFileAndChecksum(value);
-      const auto generated_hash =
-          hash_utility->GenerateHash(ReadFile(location, file_and_sum.first));
-      if (file_and_sum.second != generated_hash) {
+      auto algorithm_and_file = ParseAlgorithmAndFile(key);
+      const auto generated_hash = algorithm_and_file.first->GenerateHash(
+          ReadFile(location, algorithm_and_file.second));
+      if (generated_hash != value) {
         return TRITONSERVER_ErrorNew(
             TRITONSERVER_ERROR_INVALID_ARG,
-            (std::string("Mismatched ") + hash_utility->AlgorithmTypeString() +
-             " hash for file " + file_and_sum.first +
-             ", expect: " + file_and_sum.second + ", got: " + generated_hash)
+            (std::string("Mismatched ") +
+             algorithm_and_file.first->AlgorithmTypeString() +
+             " hash for file " + algorithm_and_file.second +
+             ", expect: " + value + ", got: " + generated_hash)
                 .c_str());
       }
     }
