@@ -30,30 +30,11 @@
 
 # Triton Checksum Repository Agent
 
-The repository agent for verifying file checksum before loading the model.
-The repository agent comunicates with Triton using [Triton RepoAgent API](https://github.com/triton-inference-server/core/tree/main/include/triton/core/tritonrepoagent.h).
-Ask questions or report problems in the main Triton [issues
+This repo contains an example [repository
+agent](https://github.com/triton-inference-server/server/blob/master/docs/repository_agents.md)
+for verifying file checksums before loading the model.  Ask questions
+or report problems in the main Triton [issues
 page](https://github.com/triton-inference-server/server/issues).
-
-## Frequently Asked Questions
-
-Full documentation is included below but these shortcuts can help you
-get started in the right direction.
-
-### Where can I ask general questions about Triton and Triton backends?
-
-Be sure to read all the information below as well as the [general
-Triton
-documentation](https://github.com/triton-inference-server/server#triton-inference-server)
-available in the main
-[server](https://github.com/triton-inference-server/server) repo. If
-you don't find your answer there you can ask questions on the main
-Triton [issues
-page](https://github.com/triton-inference-server/server/issues).
-
-### How do I build the checksum repository agent?
-
-See [build instructions](#build-the-checksum-repository-agent) below.
 
 ## Build the Checksum Repository Agent
 
@@ -74,39 +55,22 @@ $ make install
 
 The following required Triton repositories will be pulled and used in
 the build. By default the "main" branch/tag will be used for each repo
-but the listed CMake argument can be used to override.
+but the following CMake arguments can be used to override.
 
 * triton-inference-server/core: -DTRITON_CORE_REPO_TAG=[tag]
 * triton-inference-server/common: -DTRITON_COMMON_REPO_TAG=[tag]
 
-## Set Up the Checksum Repository Agent
+## Using the Checksum Repository Agent
 
-Each repository agent must be implemented as a shared library and the name of
-the shared library must be *libtritonrepoagent_<repo-agent-name>.so*. For
-checksum repository agent, if the name of it is "checksum", a model indicates
-that it uses the repository agent by setting "checksum" as 'name' in agent setting
-inside the model configuration, and Triton looks for
-*libtritonrepoagent_checksum.so* as the shared library that implements
-the checksum repository agent.
-
-For a model, *M* that specifies repository agent *A*, Triton searches for the
-repository agent shared library in the following places, in this order:
-
-* <model_repository>/M/libtritonrepoagent__B.so
-
-* <repository_agent_directory>/libtritonrepoagent__B.so
-
-Where <repository_agent_directory> is by default /opt/tritonserver/repoagents.
-
-The repository agent can be configured by specifying 'parameters' in agent
-setting inside the model configuration. The checksum repository agent will
-examine the parameters in the following way: the key specifies the message
-digest algorithm that is used to generate the checksum and the path to file
-relative to the model repository as <algorithm:relative/path/to/file> and the
-value specifies the expected checksum of the file. For example, if a model uses
-checksum repository agent to verify a file inside the model repository named
-"embedding_table", given the expected MD5 checksum of the file to be
-d726e132f91f16ebee703d96f6f73cb1, the model configuration will be:
+The checksum repository agent is configured by specifying expected
+checksum values in the [*ModelRepositoryAgents* section of the model
+configuration](https://github.com/triton-inference-server/server/blob/master/src/core/model_config.proto). A
+separate parameter is used for each file checksum in the following
+way: the key specifies the message digest algorithm that is used to
+generate the checksum and the path to file relative to the model
+repository as \<algorithm:relative/path/to/file\> and the value
+specifies the expected checksum of the file. Currently the checksum
+repository agent only supports MD5 checksums. For example:
 
 ```
 model_repository_agents
@@ -124,5 +88,7 @@ model_repository_agents
 }
 ```
 
-With the above setup, the checksum repository agent will be invoked before
-loading the model and reject the loading if the checksum does not match.
+With the above configuration, the checksum repository agent will be
+invoked before loading the model and loading will fail if the MD5
+checksum for file "embedding_table" does not match the specified
+value.
