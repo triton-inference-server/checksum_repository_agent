@@ -64,7 +64,7 @@ but the following CMake arguments can be used to override.
 
 The checksum repository agent is configured by specifying expected
 checksum values in the [*ModelRepositoryAgents* section of the model
-configuration](https://github.com/triton-inference-server/server/blob/master/src/core/model_config.proto). A
+configuration](https://github.com/triton-inference-server/common/blob/main/protobuf/model_config.proto). A
 separate parameter is used for each file checksum in the following
 way: the key specifies the message digest algorithm that is used to
 generate the checksum and the path to file relative to the model
