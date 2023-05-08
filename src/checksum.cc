@@ -27,7 +27,6 @@
 #include "triton/core/tritonrepoagent.h"
 #include "triton/core/tritonserver.h"
 
-#include <openssl/md5.h>
 #include <algorithm>
 #include <cctype>
 #include <cstring>
@@ -39,6 +38,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+
+#include <openssl/opensslv.h>
+#include <openssl/md5.h>
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+#include <openssl/evp.h>
+#endif
 
 //
 // Checksum Repository Agent that implements the TRITONREPOAGENT API.
@@ -96,7 +101,20 @@ class MD5Sum : public CheckSum {
 
   std::string GenerateHash(const std::string& message) override
   {
-    MD5((unsigned char*)message.data(), message.size(), result_);
+#if OPENSSL_VERSION_NUMBER >= 0x30000000
+    EVP_MD_CTX *mdctx;
+    const EVP_MD *md_type = EVP_get_digestbyname("md5");
+    mdctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex2(mdctx, md_type, nullptr);
+    EVP_DigestUpdate(mdctx, message.data(), message.size());
+    EVP_DigestFinal_ex(mdctx, result_, nullptr);
+    EVP_MD_CTX_free(mdctx);
+# else
+    MD5_CTX ctx;
+    MD5_Init(&ctx);
+    MD5_Update(&ctx, message.data(), message.size());
+    MD5_Final(result_, &ctx);
+#endif
     unsigned char low_mask = 0b00001111;
     unsigned char high_mask = 0b11110000;
     std::stringstream stream;
