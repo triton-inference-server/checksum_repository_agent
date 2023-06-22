@@ -24,8 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "triton/core/tritonrepoagent.h"
-#include "triton/core/tritonserver.h"
+#include <openssl/md5.h>
+#include <openssl/opensslv.h>
 
 #include <algorithm>
 #include <cctype>
@@ -39,8 +39,8 @@
 #include <utility>
 #include <vector>
 
-#include <openssl/opensslv.h>
-#include <openssl/md5.h>
+#include "triton/core/tritonrepoagent.h"
+#include "triton/core/tritonserver.h"
 #if OPENSSL_VERSION_NUMBER >= 0x30000000
 #include <openssl/evp.h>
 #endif
@@ -102,14 +102,14 @@ class MD5Sum : public CheckSum {
   std::string GenerateHash(const std::string& message) override
   {
 #if OPENSSL_VERSION_NUMBER >= 0x30000000
-    EVP_MD_CTX *mdctx;
-    const EVP_MD *md_type = EVP_get_digestbyname("md5");
+    EVP_MD_CTX* mdctx;
+    const EVP_MD* md_type = EVP_get_digestbyname("md5");
     mdctx = EVP_MD_CTX_new();
     EVP_DigestInit_ex2(mdctx, md_type, nullptr);
     EVP_DigestUpdate(mdctx, message.data(), message.size());
     EVP_DigestFinal_ex(mdctx, result_, nullptr);
     EVP_MD_CTX_free(mdctx);
-# else
+#else
     MD5_CTX ctx;
     MD5_Init(&ctx);
     MD5_Update(&ctx, message.data(), message.size());
