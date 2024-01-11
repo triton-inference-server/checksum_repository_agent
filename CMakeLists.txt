@@ -28,6 +28,9 @@ cmake_minimum_required(VERSION 3.17)
 
 project(tritonchecksumrepoagent LANGUAGES C CXX)
 
+# Use C++17 standard as Triton's minimum required.
+set(TRITON_MIN_CXX_STANDARD 17 CACHE STRING "The minimum C++ standard which features are requested to build this target.")
+
 #
 # Options
 #
@@ -85,7 +88,7 @@ target_include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_compile_features(triton-checksum-repoagent PRIVATE cxx_std_11)
+target_compile_features(triton-checksum-repoagent PRIVATE cxx_std_${TRITON_MIN_CXX_STANDARD})
 target_compile_options(
   triton-checksum-repoagent PRIVATE
   $<$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>,$<CXX_COMPILER_ID:GNU>>:
