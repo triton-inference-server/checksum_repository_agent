@@ -84,8 +84,9 @@ defending against an adversary.
   key has the form `<algorithm>:<relative/path>` and each value is the expected
   hex digest.
 - Input from the filesystem: the contents of the files named by those keys.
-- Output: success, or a `TRITONSERVER_Error` returned to the server that
-  includes the file path and the expected and computed digests.
+- Output: success, or a `TRITONSERVER_Error` returned to the server. A
+  checksum mismatch error includes the file path and the expected and computed
+  digests; an open failure error includes the file path and the `errno` text.
 - Cryptography: OpenSSL (`libcrypto`) for MD5; the only supported algorithm.
 
 **Repository Exposure Classification:** Public. This repository is publicly
@@ -120,13 +121,20 @@ aid and not an official NVIDIA label.
    between verification and use is loaded without being re-verified.
 5. **Resource exhaustion and unsafe sizing:** the whole file is read into
    memory before hashing. A very large file can exhaust memory in the server
-   process. For inputs where `tellg()` fails, such as directories or special
-   files, the size passed to `resize()` is not validated, and a blocking file
-   such as a FIFO can stall the model load.
-6. **Information disclosure through error messages:** errors include the
-   relative path, the `strerror(errno)` text, and both the expected and
-   computed digests. These propagate to server logs and to clients that
-   request model loads.
+   process. `ReadFile()` passes the result of `tellg()` straight to
+   `resize()` without validating it. For inputs where `tellg()` fails, such as
+   a directory, the invalid size makes `resize()` throw a standard library
+   exception, and an oversized file can throw `std::bad_alloc`. The load
+   action catches only the agent's own `ErrorException`, so these exceptions
+   are not turned into a model-load error and can escape the agent, which may
+   terminate the server process. A blocking file such as a FIFO can also stall
+   the model load.
+6. **Information disclosure through error messages:** what an error exposes
+   depends on the failure. A failure to open a file includes the relative path
+   and the `strerror(errno)` text, but no digests. A checksum mismatch
+   includes the relative path and both the expected and computed digests, but
+   no `strerror(errno)` text. These errors propagate to server logs and to
+   clients that request model loads.
 
 ## Critical Security Assumptions
 
